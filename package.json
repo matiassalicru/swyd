@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
+    "@tanstack/react-query": "^5.95.2",
     "babel-preset-expo": "~54.0.10",
     "expo": "~54.0.33",
     "expo-sqlite": "~16.0.10",

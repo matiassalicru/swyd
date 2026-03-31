@@ -28,7 +28,6 @@ export const TodoListScreen = () => {
     deleteTodo,
     moveTodoToSection,
     updateTodoTitle,
-    refreshTodos,
   } = useTodos();
 
   const {
@@ -37,7 +36,7 @@ export const TodoListScreen = () => {
     error: sectionsError,
     addSection,
     deleteSection,
-  } = useSections(refreshTodos);
+  } = useSections();
 
   const { isSectionCollapsed, toggleCollapse } = useCollapsedSections();
   const safeAreaInsets = useSafeAreaInsets();

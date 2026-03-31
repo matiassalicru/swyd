@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Section } from '../../domain/models/Section';
 import { useSectionRepository } from '../../di/RepositoryContext';
-import { useAsyncOperation } from './useAsyncOperation';
 
 interface UseSectionsReturn {
   sections: Section[];
@@ -17,96 +17,115 @@ interface UseSectionsReturn {
   refreshSections: () => Promise<void>;
 }
 
-export const useSections = (
-  onSectionDeleted?: () => void
-): UseSectionsReturn => {
+const SECTIONS_QUERY_KEY = ['sections'] as const;
+const TODOS_QUERY_KEY = ['todos'] as const;
+
+export const useSections = (): UseSectionsReturn => {
   const repository = useSectionRepository();
-  const [sections, setSections] = useState<Section[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const refreshSections = useCallback(async () => {
-    const allSections = await repository.getAll();
-    setSections(allSections);
-  }, [repository]);
+  const sectionsQuery = useQuery({
+    queryKey: SECTIONS_QUERY_KEY,
+    queryFn: () => repository.getAll(),
+  });
 
-  const { isSaving, error, clearError, execute } = useAsyncOperation(refreshSections);
+  const invalidateSections = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
+  }, [queryClient]);
 
-  useEffect(() => {
-    const loadInitialSections = async () => {
-      setIsLoading(true);
-      try {
-        await refreshSections();
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const invalidateSectionsAndTodos = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY }),
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY }),
+    ]);
+  }, [queryClient]);
 
-    loadInitialSections();
-  }, [refreshSections]);
+  const addSectionMutation = useMutation({
+    mutationFn: (title: string) => repository.create(title),
+    onSuccess: invalidateSections,
+  });
+
+  const renameSectionMutation = useMutation({
+    mutationFn: ({ sectionId, title }: { sectionId: number; title: string }) =>
+      repository.rename(sectionId, title),
+    onSuccess: invalidateSections,
+  });
+
+  const deleteSectionMutation = useMutation({
+    mutationFn: (sectionId: number) => repository.remove(sectionId),
+    onSuccess: invalidateSectionsAndTodos,
+  });
+
+  const isSaving =
+    addSectionMutation.isPending ||
+    renameSectionMutation.isPending ||
+    deleteSectionMutation.isPending;
+
+  const mutationError =
+    addSectionMutation.error ??
+    renameSectionMutation.error ??
+    deleteSectionMutation.error;
+
+  const queryError = sectionsQuery.error;
+  const error = mutationError?.message ?? queryError?.message ?? null;
+
+  const clearError = useCallback(() => {
+    addSectionMutation.reset();
+    renameSectionMutation.reset();
+    deleteSectionMutation.reset();
+  }, [addSectionMutation, renameSectionMutation, deleteSectionMutation]);
 
   const addSection = useCallback(
     async (title: string) => {
-      await execute(
-        async () => { await repository.create(title); },
-        'Failed to add section'
-      );
+      await addSectionMutation.mutateAsync(title);
     },
-    [repository, execute]
+    [addSectionMutation]
   );
 
   const renameSection = useCallback(
     async (sectionId: number, title: string) => {
-      await execute(
-        async () => { await repository.rename(sectionId, title); },
-        'Failed to rename section'
-      );
+      await renameSectionMutation.mutateAsync({ sectionId, title });
     },
-    [repository, execute]
+    [renameSectionMutation]
   );
 
   const deleteSection = useCallback(
     async (sectionId: number) => {
-      await execute(
-        async () => {
-          await repository.remove(sectionId);
-          // Signal that todos need refresh since orphaned todos moved to default section
-          onSectionDeleted?.();
-        },
-        'Failed to delete section'
-      );
+      await deleteSectionMutation.mutateAsync(sectionId);
     },
-    [repository, execute, onSectionDeleted]
+    [deleteSectionMutation]
   );
 
   const reorderSections = useCallback(
     (reorderedSections: Section[]) => {
-      // Optimistic update: set state immediately
-      const previousSections = sections;
+      const previousSections = sectionsQuery.data ?? [];
 
       const updatedSections = reorderedSections.map((section, position) => ({
         ...section,
         position,
       }));
 
-      setSections(updatedSections);
+      queryClient.setQueryData(SECTIONS_QUERY_KEY, updatedSections);
 
-      // Persist in background — on failure, try to refresh from server or revert
       const orderedIds = reorderedSections.map((section) => section.id);
       repository.reorder(orderedIds).catch(async () => {
         try {
-          await refreshSections();
+          await queryClient.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
         } catch (_refreshError) {
-          // If refresh also fails, revert to previous state
-          setSections(previousSections);
+          queryClient.setQueryData(SECTIONS_QUERY_KEY, previousSections);
         }
       });
     },
-    [sections, repository, refreshSections]
+    [sectionsQuery.data, repository, queryClient]
   );
 
+  const refreshSections = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: SECTIONS_QUERY_KEY });
+  }, [queryClient]);
+
   return {
-    sections,
-    isLoading,
+    sections: sectionsQuery.data ?? [],
+    isLoading: sectionsQuery.isLoading,
     isSaving,
     error,
     clearError,
