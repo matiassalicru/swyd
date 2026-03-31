@@ -1,0 +1,27 @@
+appId: com.todoapplication.app
+---
+# REQ-E2E-2: Toggle a TODO between complete and incomplete states
+# Covers scenarios 2.1 (mark completed) and 2.2 (mark incomplete again)
+
+- launchApp:
+    clearState: true
+
+# First, add a TODO to toggle
+- tapOn: "Todo title input"
+- inputText: "Read book"
+- tapOn: "Add todo"
+
+# Verify the TODO was added
+- assertVisible: "Read book"
+
+# Tap the toggle checkbox to mark as completed
+- tapOn: "Toggle Read book"
+
+# The TODO should still be visible (now in completed state)
+- assertVisible: "Read book"
+
+# Tap the toggle again to mark as incomplete
+- tapOn: "Toggle Read book"
+
+# The TODO should still be visible (back to incomplete state)
+- assertVisible: "Read book"

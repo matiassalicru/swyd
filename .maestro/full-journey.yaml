@@ -1,0 +1,51 @@
+appId: com.todoapplication.app
+---
+# REQ-E2E-4: Full journey with persistence across app relaunch
+# Covers scenario 4.1 (state persists after relaunch)
+# Tests: add multiple TODOs, toggle one, delete one, relaunch, verify state
+
+- launchApp:
+    clearState: true
+
+# Verify fresh start with empty state
+- assertVisible: "No todos yet"
+
+# Add "Buy groceries"
+- tapOn: "Todo title input"
+- inputText: "Buy groceries"
+- tapOn: "Add todo"
+- assertVisible: "Buy groceries"
+
+# Add "Walk the dog"
+- tapOn: "Todo title input"
+- inputText: "Walk the dog"
+- tapOn: "Add todo"
+- assertVisible: "Walk the dog"
+
+# Add "Read a book"
+- tapOn: "Todo title input"
+- inputText: "Read a book"
+- tapOn: "Add todo"
+- assertVisible: "Read a book"
+
+# All 3 TODOs should be visible, empty state gone
+- assertNotVisible: "No todos yet"
+
+# Toggle "Buy groceries" as completed
+- tapOn: "Toggle Buy groceries"
+
+# Delete "Walk the dog"
+- tapOn: "Delete Walk the dog"
+
+# Verify remaining state before relaunch
+- assertVisible: "Buy groceries"
+- assertVisible: "Read a book"
+- assertNotVisible: "Walk the dog"
+
+# Relaunch app WITHOUT clearState to test persistence via expo-sqlite
+- launchApp
+
+# Verify persisted state after relaunch
+- assertVisible: "Buy groceries"
+- assertVisible: "Read a book"
+- assertNotVisible: "Walk the dog"

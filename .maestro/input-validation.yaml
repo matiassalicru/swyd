@@ -1,0 +1,28 @@
+appId: com.todoapplication.app
+---
+# REQ-E2E-5: Input validation - empty input must not create a TODO
+# Covers scenario 5.1 (empty input submission rejected)
+#
+# Note: The add button is disabled when input is empty (isInputEmpty check
+# in TodoInput.tsx). Tapping a disabled Pressable should have no effect.
+# Additionally, handleSubmit guards with a trim().length === 0 check.
+
+- launchApp:
+    clearState: true
+
+# Verify empty state is visible on fresh launch
+- assertVisible: "No todos yet"
+
+# Tap the add button without typing anything (button is disabled)
+- tapOn: "Add todo"
+
+# Assert empty state is still visible (no TODO was added)
+- assertVisible: "No todos yet"
+
+# Now type only spaces and try to submit
+- tapOn: "Todo title input"
+- inputText: "   "
+- tapOn: "Add todo"
+
+# Assert empty state is still visible (spaces-only input rejected)
+- assertVisible: "No todos yet"

@@ -1,0 +1,24 @@
+appId: com.todoapplication.app
+---
+# REQ-E2E-1: Add a TODO item and verify it appears in the list
+# Covers scenarios 1.1 (add with valid title) and 1.2 (empty state disappears)
+
+- launchApp:
+    clearState: true
+
+# Verify empty state is visible on fresh launch
+- assertVisible: "No todos yet"
+- assertVisible: "Add your first task above to get started"
+
+# Type a TODO title into the input field
+- tapOn: "Todo title input"
+- inputText: "Buy groceries"
+
+# Tap the add button to submit
+- tapOn: "Add todo"
+
+# Assert the TODO text appears in the list
+- assertVisible: "Buy groceries"
+
+# Assert empty state is no longer visible
+- assertNotVisible: "No todos yet"

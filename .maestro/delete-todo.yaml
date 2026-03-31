@@ -1,0 +1,27 @@
+appId: com.todoapplication.app
+---
+# REQ-E2E-3: Delete a TODO item from the list
+# Covers scenarios 3.1 (delete from list) and 3.2 (empty state returns)
+
+- launchApp:
+    clearState: true
+
+# Add a TODO to delete
+- tapOn: "Todo title input"
+- inputText: "Old task"
+- tapOn: "Add todo"
+
+# Verify the TODO was added
+- assertVisible: "Old task"
+
+# Verify empty state is gone
+- assertNotVisible: "No todos yet"
+
+# Tap the delete button for this TODO
+- tapOn: "Delete Old task"
+
+# Assert the TODO is no longer visible
+- assertNotVisible: "Old task"
+
+# Assert empty state is back since it was the last TODO
+- assertVisible: "No todos yet"
