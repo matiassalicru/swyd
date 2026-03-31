@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { Section } from '../../domain/models/Section';
 import { useSectionRepository } from '../../di/RepositoryContext';
+import { useAsyncOperation } from './useAsyncOperation';
 
 interface UseSectionsReturn {
   sections: Section[];
@@ -22,17 +23,13 @@ export const useSections = (
   const repository = useSectionRepository();
   const [sections, setSections] = useState<Section[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
 
   const refreshSections = useCallback(async () => {
     const allSections = await repository.getAll();
     setSections(allSections);
   }, [repository]);
+
+  const { isSaving, error, clearError, execute } = useAsyncOperation(refreshSections);
 
   useEffect(() => {
     const loadInitialSections = async () => {
@@ -49,58 +46,36 @@ export const useSections = (
 
   const addSection = useCallback(
     async (title: string) => {
-      setError(null);
-      setIsSaving(true);
-      try {
-        await repository.create(title);
-        await refreshSections();
-      } catch (caughtError) {
-        const errorMessage =
-          caughtError instanceof Error ? caughtError.message : 'Failed to add section';
-        setError(errorMessage);
-      } finally {
-        setIsSaving(false);
-      }
+      await execute(
+        async () => { await repository.create(title); },
+        'Failed to add section'
+      );
     },
-    [repository, refreshSections]
+    [repository, execute]
   );
 
   const renameSection = useCallback(
-    async (id: number, title: string) => {
-      setError(null);
-      setIsSaving(true);
-      try {
-        await repository.rename(id, title);
-        await refreshSections();
-      } catch (caughtError) {
-        const errorMessage =
-          caughtError instanceof Error ? caughtError.message : 'Failed to rename section';
-        setError(errorMessage);
-      } finally {
-        setIsSaving(false);
-      }
+    async (sectionId: number, title: string) => {
+      await execute(
+        async () => { await repository.rename(sectionId, title); },
+        'Failed to rename section'
+      );
     },
-    [repository, refreshSections]
+    [repository, execute]
   );
 
   const deleteSection = useCallback(
-    async (id: number) => {
-      setError(null);
-      setIsSaving(true);
-      try {
-        await repository.remove(id);
-        await refreshSections();
-        // Signal that todos need refresh since orphaned todos moved to default section
-        onSectionDeleted?.();
-      } catch (caughtError) {
-        const errorMessage =
-          caughtError instanceof Error ? caughtError.message : 'Failed to delete section';
-        setError(errorMessage);
-      } finally {
-        setIsSaving(false);
-      }
+    async (sectionId: number) => {
+      await execute(
+        async () => {
+          await repository.remove(sectionId);
+          // Signal that todos need refresh since orphaned todos moved to default section
+          onSectionDeleted?.();
+        },
+        'Failed to delete section'
+      );
     },
-    [repository, refreshSections, onSectionDeleted]
+    [repository, execute, onSectionDeleted]
   );
 
   const reorderSections = useCallback(
@@ -115,10 +90,9 @@ export const useSections = (
 
       setSections(updatedSections);
 
-      // Persist in background
+      // Persist in background — on failure, try to refresh from server or revert
       const orderedIds = reorderedSections.map((section) => section.id);
       repository.reorder(orderedIds).catch(async () => {
-        setError('Failed to reorder sections');
         try {
           await refreshSections();
         } catch (_refreshError) {

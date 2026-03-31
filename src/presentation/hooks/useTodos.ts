@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Todo } from '../../domain/models/Todo';
 import { useTodoRepository } from '../../di/RepositoryContext';
 import { DEFAULT_SECTION_ID } from '../../data/local/database';
+import { useAsyncOperation } from './useAsyncOperation';
 
 interface UseTodosReturn {
   todos: Todo[];
@@ -22,17 +23,13 @@ export const useTodos = (): UseTodosReturn => {
   const repository = useTodoRepository();
   const [todos, setTodos] = useState<Todo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
 
   const refreshTodos = useCallback(async () => {
     const allTodos = await repository.getAll();
     setTodos(allTodos);
   }, [repository]);
+
+  const { isSaving, error, clearError, execute } = useAsyncOperation(refreshTodos);
 
   useEffect(() => {
     const loadInitialTodos = async () => {
@@ -49,92 +46,52 @@ export const useTodos = (): UseTodosReturn => {
 
   const addTodo = useCallback(
     async (title: string, sectionId: number = DEFAULT_SECTION_ID) => {
-      setError(null);
-      setIsSaving(true);
-      try {
-        await repository.create(title, sectionId);
-        await refreshTodos();
-      } catch (caughtError) {
-        const errorMessage =
-          caughtError instanceof Error ? caughtError.message : 'Failed to add todo';
-        setError(errorMessage);
-      } finally {
-        setIsSaving(false);
-      }
+      await execute(
+        async () => { await repository.create(title, sectionId); },
+        'Failed to add todo'
+      );
     },
-    [repository, refreshTodos]
+    [repository, execute]
   );
 
   const toggleTodo = useCallback(
-    async (id: number) => {
-      setError(null);
-      setIsSaving(true);
-      try {
-        await repository.toggleComplete(id);
-        await refreshTodos();
-      } catch (caughtError) {
-        const errorMessage =
-          caughtError instanceof Error ? caughtError.message : 'Failed to toggle todo';
-        setError(errorMessage);
-      } finally {
-        setIsSaving(false);
-      }
+    async (todoId: number) => {
+      await execute(
+        () => repository.toggleComplete(todoId),
+        'Failed to toggle todo'
+      );
     },
-    [repository, refreshTodos]
+    [repository, execute]
   );
 
   const deleteTodo = useCallback(
-    async (id: number) => {
-      setError(null);
-      setIsSaving(true);
-      try {
-        await repository.remove(id);
-        await refreshTodos();
-      } catch (caughtError) {
-        const errorMessage =
-          caughtError instanceof Error ? caughtError.message : 'Failed to delete todo';
-        setError(errorMessage);
-      } finally {
-        setIsSaving(false);
-      }
+    async (todoId: number) => {
+      await execute(
+        () => repository.remove(todoId),
+        'Failed to delete todo'
+      );
     },
-    [repository, refreshTodos]
+    [repository, execute]
   );
 
   const moveTodoToSection = useCallback(
     async (todoId: number, targetSectionId: number) => {
-      setError(null);
-      setIsSaving(true);
-      try {
-        await repository.moveToSection(todoId, targetSectionId);
-        await refreshTodos();
-      } catch (caughtError) {
-        const errorMessage =
-          caughtError instanceof Error ? caughtError.message : 'Failed to move todo';
-        setError(errorMessage);
-      } finally {
-        setIsSaving(false);
-      }
+      await execute(
+        () => repository.moveToSection(todoId, targetSectionId),
+        'Failed to move todo'
+      );
     },
-    [repository, refreshTodos]
+    [repository, execute]
   );
 
   const updateTodoTitle = useCallback(
     async (todoId: number, newTitle: string) => {
-      setError(null);
-      setIsSaving(true);
-      try {
-        await repository.updateTitle(todoId, newTitle);
-        await refreshTodos();
-      } catch (caughtError) {
-        const errorMessage =
-          caughtError instanceof Error ? caughtError.message : 'Failed to update todo title';
-        setError(errorMessage);
-      } finally {
-        setIsSaving(false);
-      }
+      await execute(
+        () => repository.updateTitle(todoId, newTitle),
+        'Failed to update todo title'
+      );
     },
-    [repository, refreshTodos]
+    [repository, execute]
   );
 
   return {

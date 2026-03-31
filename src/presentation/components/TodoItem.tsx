@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, TextInput, UIManager, View } from 'react-native';
+import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 
 import { Section } from '../../domain/models/Section';
 import { Todo } from '../../domain/models/Todo';
 import { ConfirmationModal } from './ConfirmationModal';
+import { EditableTitle } from './EditableTitle';
 import { MoveSectionModal } from './MoveSectionModal';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
@@ -25,11 +26,8 @@ interface TodoItemProps {
 }
 
 export const TodoItem = ({ todo, onToggle, onDelete, onEdit, onMove, sections, currentSectionId }: TodoItemProps) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editText, setEditText] = useState(todo.title);
   const [isMoveModalVisible, setIsMoveModalVisible] = useState(false);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
-  const inputRef = useRef<TextInput>(null);
   const swipeableRef = useRef<Swipeable>(null);
 
   const handleToggle = () => {
@@ -48,20 +46,8 @@ export const TodoItem = ({ todo, onToggle, onDelete, onEdit, onMove, sections, c
     onDelete(todo.id);
   };
 
-  const handleStartEditing = () => {
-    setEditText(todo.title);
-    setIsEditing(true);
-  };
-
-  const handleFinishEditing = () => {
-    const trimmedTitle = editText.trim();
-
-    if (trimmedTitle.length > 0 && trimmedTitle !== todo.title) {
-      onEdit(todo.id, trimmedTitle);
-    }
-
-    setEditText(todo.title);
-    setIsEditing(false);
+  const handleSaveTitle = (newTitle: string) => {
+    onEdit(todo.id, newTitle);
   };
 
   const handleLongPress = () => {
@@ -124,25 +110,11 @@ export const TodoItem = ({ todo, onToggle, onDelete, onEdit, onMove, sections, c
             </View>
           </Pressable>
 
-          {isEditing ? (
-            <TextInput
-              ref={inputRef}
-              style={[styles.titleInput, todo.completed && styles.titleCompleted]}
-              value={editText}
-              onChangeText={setEditText}
-              onSubmitEditing={handleFinishEditing}
-              onBlur={handleFinishEditing}
-              autoFocus
-              returnKeyType="done"
-              selectTextOnFocus
-            />
-          ) : (
-            <Pressable style={styles.textArea} onPress={handleStartEditing}>
-              <Text style={[styles.title, todo.completed && styles.titleCompleted]}>
-                {todo.title}
-              </Text>
-            </Pressable>
-          )}
+          <EditableTitle
+            title={todo.title}
+            isCompleted={todo.completed}
+            onSave={handleSaveTitle}
+          />
         </Pressable>
       </Swipeable>
 
@@ -185,28 +157,6 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  textArea: {
-    flex: 1,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '400',
-    color: colors.text,
-  },
-  titleInput: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '400',
-    color: colors.text,
-    minHeight: 44,
-    padding: 0,
-  },
-  titleCompleted: {
-    textDecorationLine: 'line-through',
-    color: colors.disabled,
   },
   checkbox: {
     width: 24,

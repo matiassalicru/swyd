@@ -1,31 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { useTextInputSubmit } from '../hooks/useTextInputSubmit';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
+import { BORDER_RADIUS_SM, DISABLED_OPACITY } from '../theme/styleConstants';
 
 interface SectionInputProps {
   onAdd: (title: string) => void;
 }
 
 export const SectionInput = ({ onAdd }: SectionInputProps) => {
-  const inputRef = useRef<TextInput>(null);
-  const [inputText, setInputText] = useState('');
-
-  const isInputEmpty = inputText.trim().length === 0;
-
-  const handleSubmit = () => {
-    const trimmedTitle = inputText.trim();
-
-    if (trimmedTitle.length === 0) {
-      return;
-    }
-
-    onAdd(trimmedTitle);
-    setInputText('');
-    inputRef.current?.focus();
-  };
+  const { inputText, setInputText, inputRef, handleSubmit, isInputEmpty } =
+    useTextInputSubmit({ onSubmit: onAdd });
 
   return (
     <View style={styles.container}>
@@ -71,7 +58,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS_SM,
     paddingHorizontal: spacing.md,
     fontSize: 14,
     fontWeight: '400',
@@ -85,6 +72,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addButtonDisabled: {
-    opacity: 0.5,
+    opacity: DISABLED_OPACITY,
   },
 });

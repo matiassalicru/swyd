@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRef, useState } from 'react';
+import { useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Section } from '../../domain/models/Section';
+import { useTextInputSubmit } from '../hooks/useTextInputSubmit';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
+import { BORDER_RADIUS_SM, DISABLED_OPACITY } from '../theme/styleConstants';
 
 interface TodoInputProps {
   onAdd: (title: string, sectionId: number) => void;
@@ -21,23 +23,15 @@ export const TodoInput = ({
   onSectionChange,
   disabled = false,
 }: TodoInputProps) => {
-  const inputRef = useRef<TextInput>(null);
-  const [inputText, setInputText] = useState('');
+  const handleAdd = useCallback(
+    (trimmedText: string) => onAdd(trimmedText, selectedSectionId),
+    [onAdd, selectedSectionId],
+  );
 
-  const isInputEmpty = inputText.trim().length === 0;
+  const { inputText, setInputText, inputRef, handleSubmit, isInputEmpty } =
+    useTextInputSubmit({ onSubmit: handleAdd });
+
   const isButtonDisabled = disabled || isInputEmpty;
-
-  const handleSubmit = () => {
-    const trimmedTitle = inputText.trim();
-
-    if (trimmedTitle.length === 0) {
-      return;
-    }
-
-    onAdd(trimmedTitle, selectedSectionId);
-    setInputText('');
-    inputRef.current?.focus();
-  };
 
   return (
     <View style={styles.container}>
@@ -125,7 +119,7 @@ const styles = StyleSheet.create({
     height: 48,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS_SM,
     paddingHorizontal: spacing.md,
     fontSize: 16,
     fontWeight: '400',
@@ -133,7 +127,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   inputDisabled: {
-    opacity: 0.5,
+    opacity: DISABLED_OPACITY,
   },
   addButton: {
     width: 48,
@@ -144,7 +138,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addButtonDisabled: {
-    opacity: 0.5,
+    opacity: DISABLED_OPACITY,
   },
   chipsContainer: {
     flexDirection: 'row',
