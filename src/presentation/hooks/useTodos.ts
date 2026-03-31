@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Todo } from '../../domain/models/Todo';
 import { useTodoRepository } from '../../di/RepositoryContext';
 import { DEFAULT_SECTION_ID } from '../../data/local/database';
-import { useAsyncOperation } from './useAsyncOperation';
 
 interface UseTodosReturn {
   todos: Todo[];
@@ -19,84 +19,116 @@ interface UseTodosReturn {
   refreshTodos: () => Promise<void>;
 }
 
+const TODOS_QUERY_KEY = ['todos'] as const;
+
 export const useTodos = (): UseTodosReturn => {
   const repository = useTodoRepository();
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const refreshTodos = useCallback(async () => {
-    const allTodos = await repository.getAll();
-    setTodos(allTodos);
-  }, [repository]);
+  const todosQuery = useQuery({
+    queryKey: TODOS_QUERY_KEY,
+    queryFn: () => repository.getAll(),
+  });
 
-  const { isSaving, error, clearError, execute } = useAsyncOperation(refreshTodos);
+  const invalidateTodos = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+  }, [queryClient]);
 
-  useEffect(() => {
-    const loadInitialTodos = async () => {
-      setIsLoading(true);
-      try {
-        await refreshTodos();
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const addTodoMutation = useMutation({
+    mutationFn: ({ title, sectionId }: { title: string; sectionId: number }) =>
+      repository.create(title, sectionId),
+    onSuccess: invalidateTodos,
+  });
 
-    loadInitialTodos();
-  }, [refreshTodos]);
+  const toggleTodoMutation = useMutation({
+    mutationFn: (todoId: number) => repository.toggleComplete(todoId),
+    onSuccess: invalidateTodos,
+  });
+
+  const deleteTodoMutation = useMutation({
+    mutationFn: (todoId: number) => repository.remove(todoId),
+    onSuccess: invalidateTodos,
+  });
+
+  const moveTodoToSectionMutation = useMutation({
+    mutationFn: ({ todoId, targetSectionId }: { todoId: number; targetSectionId: number }) =>
+      repository.moveToSection(todoId, targetSectionId),
+    onSuccess: invalidateTodos,
+  });
+
+  const updateTodoTitleMutation = useMutation({
+    mutationFn: ({ todoId, newTitle }: { todoId: number; newTitle: string }) =>
+      repository.updateTitle(todoId, newTitle),
+    onSuccess: invalidateTodos,
+  });
+
+  const isSaving =
+    addTodoMutation.isPending ||
+    toggleTodoMutation.isPending ||
+    deleteTodoMutation.isPending ||
+    moveTodoToSectionMutation.isPending ||
+    updateTodoTitleMutation.isPending;
+
+  const mutationError =
+    addTodoMutation.error ??
+    toggleTodoMutation.error ??
+    deleteTodoMutation.error ??
+    moveTodoToSectionMutation.error ??
+    updateTodoTitleMutation.error;
+
+  const queryError = todosQuery.error;
+  const error = mutationError?.message ?? queryError?.message ?? null;
+
+  const clearError = useCallback(() => {
+    addTodoMutation.reset();
+    toggleTodoMutation.reset();
+    deleteTodoMutation.reset();
+    moveTodoToSectionMutation.reset();
+    updateTodoTitleMutation.reset();
+  }, [addTodoMutation, toggleTodoMutation, deleteTodoMutation, moveTodoToSectionMutation, updateTodoTitleMutation]);
 
   const addTodo = useCallback(
     async (title: string, sectionId: number = DEFAULT_SECTION_ID) => {
-      await execute(
-        async () => { await repository.create(title, sectionId); },
-        'Failed to add todo'
-      );
+      await addTodoMutation.mutateAsync({ title, sectionId });
     },
-    [repository, execute]
+    [addTodoMutation]
   );
 
   const toggleTodo = useCallback(
     async (todoId: number) => {
-      await execute(
-        () => repository.toggleComplete(todoId),
-        'Failed to toggle todo'
-      );
+      await toggleTodoMutation.mutateAsync(todoId);
     },
-    [repository, execute]
+    [toggleTodoMutation]
   );
 
   const deleteTodo = useCallback(
     async (todoId: number) => {
-      await execute(
-        () => repository.remove(todoId),
-        'Failed to delete todo'
-      );
+      await deleteTodoMutation.mutateAsync(todoId);
     },
-    [repository, execute]
+    [deleteTodoMutation]
   );
 
   const moveTodoToSection = useCallback(
     async (todoId: number, targetSectionId: number) => {
-      await execute(
-        () => repository.moveToSection(todoId, targetSectionId),
-        'Failed to move todo'
-      );
+      await moveTodoToSectionMutation.mutateAsync({ todoId, targetSectionId });
     },
-    [repository, execute]
+    [moveTodoToSectionMutation]
   );
 
   const updateTodoTitle = useCallback(
     async (todoId: number, newTitle: string) => {
-      await execute(
-        () => repository.updateTitle(todoId, newTitle),
-        'Failed to update todo title'
-      );
+      await updateTodoTitleMutation.mutateAsync({ todoId, newTitle });
     },
-    [repository, execute]
+    [updateTodoTitleMutation]
   );
 
+  const refreshTodos = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+  }, [queryClient]);
+
   return {
-    todos,
-    isLoading,
+    todos: todosQuery.data ?? [],
+    isLoading: todosQuery.isLoading,
     isSaving,
     error,
     clearError,
